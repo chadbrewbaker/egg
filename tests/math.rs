@@ -74,20 +74,11 @@ impl Analysis<Math> for ConstantFold {
         })
     }
 
-    fn merge(&mut self, a: &mut Self::Data, b: Self::Data) -> DidMerge {
-        match (a.as_mut(), &b) {
-            (None, None) => DidMerge(false, false),
-            (None, Some(_)) => {
-                *a = b;
-                DidMerge(true, false)
-            }
-            (Some(_), None) => DidMerge(false, true),
-            (Some(_), Some(_)) => DidMerge(false, false),
-        }
-        // if a.is_none() && b.is_some() {
-        //     *a = b
-        // }
-        // cmp
+    fn merge(&mut self, to: &mut Self::Data, from: Self::Data) -> DidMerge {
+        merge_option(to, from, |a, b| {
+            assert_eq!(a.0, b.0, "Merged non-equal constants");
+            DidMerge(false, false)
+        })
     }
 
     fn modify(egraph: &mut EGraph, id: Id) {
@@ -327,6 +318,52 @@ fn assoc_mul_saturates() {
         .run(&rules());
 
     assert!(matches!(runner.stop_reason, Some(StopReason::Saturated)));
+}
+
+#[test]
+fn test_union_trusted() {
+    let expr: RecExpr<Math> = "(+ (* x 1) y)".parse().unwrap();
+    let expr2 = "20".parse().unwrap();
+    let mut runner: Runner<Math, ConstantFold> = Runner::default()
+        .with_explanations_enabled()
+        .with_iter_limit(3)
+        .with_expr(&expr)
+        .run(&rules());
+    let lhs = runner.egraph.add_expr(&expr);
+    let rhs = runner.egraph.add_expr(&expr2);
+    runner.egraph.union_trusted(lhs, rhs, "whatever");
+    let proof = runner.explain_equivalence(&expr, &expr2).get_flat_strings();
+    assert_eq!(
+        proof,
+        vec![
+            "(+ (* x 1) y)",
+            "(+ (Rewrite<= mul-one x) y)",
+            "(+ (Rewrite<= one-mul (* x 1)) y)",
+            "(Rewrite=> whatever 20)"
+        ]
+    );
+}
+
+#[cfg(feature = "lp")]
+#[test]
+fn math_lp_extract() {
+    let expr: RecExpr<Math> = "(pow (+ x (+ x x)) (+ x x))".parse().unwrap();
+
+    let runner: Runner<Math, ConstantFold> = Runner::default()
+        .with_iter_limit(3)
+        .with_expr(&expr)
+        .run(&rules());
+    let root = runner.roots[0];
+
+    let best = Extractor::new(&runner.egraph, AstSize).find_best(root).1;
+    let lp_best = LpExtractor::new(&runner.egraph, AstSize).solve(root);
+
+    println!("input   [{}] {}", expr.as_ref().len(), expr);
+    println!("normal  [{}] {}", best.as_ref().len(), best);
+    println!("ilp cse [{}] {}", lp_best.as_ref().len(), lp_best);
+
+    assert_ne!(best, lp_best);
+    assert_eq!(lp_best.as_ref().len(), 4);
 }
 
 #[test]
