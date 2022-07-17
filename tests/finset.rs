@@ -15,29 +15,29 @@ pub type Constant = NotNan<f64>;
 
 define_language! {
     pub enum Math {
-  //      "d" = Diff([Id; 2]),
-  //      "i" = Integral([Id; 2]),
+      //  "d" = Diff([Id; 2]),
+      //  "i" = Integral([Id; 2]),
 
         "+" = Add([Id; 2]),
      //   "-" = Sub([Id; 2]),
         "*" = Mul([Id; 2]),
      //   "/" = Div([Id; 2]),
         "pow" = Pow([Id; 2]),
-      //  "ln" = Ln(Id),
+    //    "ln" = Ln(Id),
       //  "sqrt" = Sqrt(Id),
 
-      //  "sin" = Sin(Id),
+    //   "sin" = Sin(Id),
      //   "cos" = Cos(Id),
 
-     //   Constant(Constant),
-        Symbol(Symbol),
+        Constant(Constant),
+       Symbol(Symbol),
     }
 }
 
 // You could use egg::AstSize, but this is useful for debugging, since
 // it will really try to get rid of the Diff operator
 
-/*
+
 pub struct MathCostFn;
 impl egg::CostFunction<Math> for MathCostFn {
     type Cost = usize;
@@ -47,12 +47,12 @@ impl egg::CostFunction<Math> for MathCostFn {
     {
         let op_cost = match enode {
      //      Math::Diff(..) => 100,
-     //       Math::Integral(..) => 100,
-     //       _ => 1,
+      //      Math::Integral(..) => 100,
+            _ => 1,
         };
         enode.fold(op_cost, |sum, i| sum + costs(i))
     }
-} */
+} 
 
 #[derive(Default)]
 pub struct ConstantFold;
@@ -62,7 +62,7 @@ impl Analysis<Math> for ConstantFold {
     fn make(egraph: &EGraph, enode: &Math) -> Self::Data {
         let x = |i: &Id| egraph[*i].data.as_ref().map(|d| d.0);
         Some(match enode {
-          //  Math::Constant(c) => (*c, format!("{}", c).parse().unwrap()),
+           Math::Constant(c) => (*c, format!("{}", c).parse().unwrap()),
             Math::Add([a, b]) => (
                 x(a)? + x(b)?,
                 format!("(+ {} {})", x(a)?, x(b)?).parse().unwrap(),
@@ -110,8 +110,8 @@ impl Analysis<Math> for ConstantFold {
                     "constant_fold".to_string(),
                 );
             } else {
-         //       let added = egraph.add(Math::Constant(c));
-           //     egraph.union(id, added);
+                let added = egraph.add(Math::Constant(c));
+               egraph.union(id, added);
             }
             // to not prune, comment this out
             egraph[id].nodes.retain(|n| n.is_leaf());
@@ -164,6 +164,7 @@ fn is_not_zero(var: &str) -> impl Fn(&mut EGraph, Id, &Subst) -> bool {
 #[rustfmt::skip]
 pub fn rules() -> Vec<Rewrite> { vec![
     rw!("comm-add";  "(+ ?a ?b)"        => "(+ ?b ?a)"),
+    
     rw!("comm-mul";  "(* ?a ?b)"        => "(* ?b ?a)"),
     rw!("assoc-add"; "(+ ?a (+ ?b ?c))" => "(+ (+ ?a ?b) ?c)"),
     rw!("assoc-mul"; "(* ?a (* ?b ?c))" => "(* (* ?a ?b) ?c)"),
@@ -181,21 +182,21 @@ pub fn rules() -> Vec<Rewrite> { vec![
     // rw!("canon-sub"; "(+ ?a (* -1 ?b))"   => "(- ?a ?b)"),
     // rw!("canon-div"; "(* ?a (pow ?b -1))" => "(/ ?a ?b)" if is_not_zero("?b")),
 
- //   rw!("zero-add"; "(+ ?a 0)" => "?a"),
- //   rw!("zero-mul"; "(* ?a 0)" => "0"),
- //   rw!("one-mul";  "(* ?a 1)" => "?a"),
+    rw!("zero-add"; "(+ ?a 0)" => "?a"),
+   // rw!("zero-mul"; "(* ?a 0)" => "0"),
+    rw!("one-mul";  "(* ?a 1)" => "?a"),
 
-  //  rw!("add-zero"; "?a" => "(+ ?a 0)"),
-  //  rw!("mul-one";  "?a" => "(* ?a 1)"),
+    rw!("add-zero"; "?a" => "(+ ?a 0)"),
+    rw!("mul-one";  "?a" => "(* ?a 1)"),
 
    // rw!("cancel-sub"; "(- ?a ?a)" => "0"),
   //  rw!("cancel-div"; "(/ ?a ?a)" => "1" if is_not_zero("?a")),
 
   
- //   rw!("pow0"; "(pow ?x 0)" => "1"
- //       if is_not_zero("?x")),
- //   rw!("pow1"; "(pow ?x 1)" => "?x"),
- //   rw!("pow2"; "(pow ?x 2)" => "(* ?x ?x)"),
+  rw!("pow0"; "(pow ?x 0)" => "1"
+        if is_not_zero("?x")),
+    rw!("pow1"; "(pow ?x 1)" => "?x"),
+    rw!("pow2"; "(pow ?x 2)" => "(* ?x ?x)"),
   //  rw!("pow-recip"; "(pow ?x -1)" => "(/ 1 ?x)"
    //     if is_not_zero("?x")),
   //  rw!("recip-mul-div"; "(* ?x (/ 1 ?x))" => "1" if is_not_zero("?x")),
@@ -203,10 +204,10 @@ pub fn rules() -> Vec<Rewrite> { vec![
    // rw!("d-variable"; "(d ?x ?x)" => "1" if is_sym("?x")),
    // rw!("d-constant"; "(d ?x ?c)" => "0" if is_sym("?x") if is_const_or_distinct_var("?c", "?x")),
 
-    //rw!("d-add"; "(d ?x (+ ?a ?b))" => "(+ (d ?x ?a) (d ?x ?b))"),
-   // rw!("d-mul"; "(d ?x (* ?a ?b))" => "(+ (* ?a (d ?x ?b)) (* ?b (d ?x ?a)))"),
+   // rw!("d-add"; "(d ?x (+ ?a ?b))" => "(+ (d ?x ?a) (d ?x ?b))"),
+  //  rw!("d-mul"; "(d ?x (* ?a ?b))" => "(+ (* ?a (d ?x ?b)) (* ?b (d ?x ?a)))"),
 
-  //  rw!("d-sin"; "(d ?x (sin ?x))" => "(cos ?x)"),
+   //rw!("d-sin"; "(d ?x (sin ?x))" => "(cos ?x)"),
   //  rw!("d-cos"; "(d ?x (cos ?x))" => "(* -1 (sin ?x))"),
 
   //  rw!("d-ln"; "(d ?x (ln ?x))" => "(/ 1 ?x)" if is_not_zero("?x")),
@@ -222,8 +223,8 @@ pub fn rules() -> Vec<Rewrite> { vec![
         if is_not_zero("?g")
     ),
 */
-//    rw!("i-one"; "(i 1 ?x)" => "?x"),
-//    rw!("i-power-const"; "(i (pow ?x ?c) ?x)" =>
+  //  rw!("i-one"; "(i 1 ?x)" => "?x"),
+  //  rw!("i-power-const"; "(i (pow ?x ?c) ?x)" =>
  //       "(/ (pow ?x (+ ?c 1)) (+ ?c 1))" if is_const("?c")),
   //  rw!("i-cos"; "(i (cos ?x) ?x)" => "(sin ?x)"),
   //  rw!("i-sin"; "(i (sin ?x) ?x)" => "(* -1 (cos ?x))"),
@@ -233,10 +234,9 @@ pub fn rules() -> Vec<Rewrite> { vec![
   //      "(- (* ?a (i ?b ?x)) (i (* (d ?x ?a) (i ?b ?x)) ?x))"),
 ]}
 
-/*
 
 egg::test_fn! {
-    math_associate_adds, [
+    finset_associate_adds, [
         rw!("comm-add"; "(+ ?a ?b)" => "(+ ?b ?a)"),
         rw!("assoc-add"; "(+ ?a (+ ?b ?c))" => "(+ (+ ?a ?b) ?c)"),
     ],
@@ -248,7 +248,7 @@ egg::test_fn! {
     "(+ 7 (+ 6 (+ 5 (+ 4 (+ 3 (+ 2 1))))))"
     @check |r: Runner<Math, ()>| assert_eq!(r.egraph.number_of_classes(), 127)
 }
-*/
+
 
 //egg::test_fn! {
 //    #[should_panic(expected = "Could not prove goal 0")]
@@ -256,8 +256,8 @@ egg::test_fn! {
 //    "(+ x y)" => "(/ x y)"
 //}
 
-//egg::test_fn! {math_simplify_add, rules(), "(+ x (+ x (+ x x)))" => "(* 4 x)" }
-//egg::test_fn! {math_powers, rules(), "(* (pow 2 x) (pow 2 y))" => "(pow 2 (+ x y))"}
+egg::test_fn! {finset_simplify_add, rules(), "(+ x (+ x (+ x x)))" => "(* 4 x)" }
+egg::test_fn! {math_powers, rules(), "(* (pow 2 x) (pow 2 y))" => "(pow 2 (+ x y))"}
 
 //egg::test_fn! {
 //    math_simplify_const, rules(),
@@ -279,14 +279,14 @@ egg::test_fn! {
 }
 */
 
-/*
+
 egg::test_fn! {
     math_simplify_factor, rules(),
     "(* (+ x 3) (+ x 1))"
     =>
     "(+ (+ (* x x) (* 4 x)) 3)"
 }
-*/
+
 
 
 //egg::test_fn! {math_diff_same,      rules(), "(d x x)" => "1"}
@@ -340,7 +340,7 @@ egg::test_fn! {
 //    integ_part3, rules(), "(i (ln x) x)" => "(- (* x (ln x)) x)"
 //}
 
-/*
+
 #[test]
 fn assoc_mul_saturates() {
     let expr: RecExpr<Math> = "(* x 1)".parse().unwrap();
@@ -351,7 +351,7 @@ fn assoc_mul_saturates() {
         .run(&rules());
 
     assert!(matches!(runner.stop_reason, Some(StopReason::Saturated)));
-} */
+} 
 
 #[test]
 fn math_ematching_bench() {
@@ -378,9 +378,9 @@ fn math_ematching_bench() {
         "(+ (* ?a ?b) (* ?a ?c))",
         "(* (pow ?a ?b) (pow ?a ?c))",
       //  "(* ?x (/ 1 ?x))",
-     //   "(d ?x (+ ?a ?b))",
-      //  "(+ (d ?x ?a) (d ?x ?b))",
-     //   "(d ?x (* ?a ?b))",
+      //  "(d ?x (+ ?a ?b))",
+     //  "(+ (d ?x ?a) (d ?x ?b))",
+    //    "(d ?x (* ?a ?b))",
      //   "(+ (* ?a (d ?x ?b)) (* ?b (d ?x ?a)))",
      //   "(d ?x (sin ?x))",
      //   "(d ?x (cos ?x))",
@@ -393,11 +393,11 @@ fn math_ematching_bench() {
       //  "(* (pow ?f ?g) (+ (* (d ?x ?f) (/ ?g ?f)) (* (d ?x ?g) (ln ?f))))",
       //  "(i (pow ?x ?c) ?x)",
      //   "(/ (pow ?x (+ ?c 1)) (+ ?c 1))",
-      //  "(i (+ ?f ?g) ?x)",
+     //   "(i (+ ?f ?g) ?x)",
       //  "(i (- ?f ?g) ?x)",
-      //  "(+ (i ?f ?x) (i ?g ?x))",
+     //   "(+ (i ?f ?x) (i ?g ?x))",
       //  "(- (i ?f ?x) (i ?g ?x))",
-      //  "(i (* ?a ?b) ?x)",
+    //    "(i (* ?a ?b) ?x)",
        // "(- (* ?a (i ?b ?x)) (i (* (d ?x ?a) (i ?b ?x)) ?x))",
     ];
 
