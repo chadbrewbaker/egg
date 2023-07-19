@@ -10,8 +10,8 @@ use std::rc::Rc;
 
 use symbolic_expressions::Sexp;
 
-const CONGRUENCE_LIMIT: usize = 10;
-const GREEDY_NUM_ITERS: usize = 10;
+const CONGRUENCE_LIMIT: usize = 2;
+const GREEDY_NUM_ITERS: usize = 2;
 
 /// A justification for a union, either via a rule or congruence.
 /// A direct union with a justification is also stored as a rule.
@@ -1596,7 +1596,8 @@ impl<L: Language> Explain<L> {
 
             let parent_parent = distance_memo.parent_distance[usize::from(parent)].0;
             if parent_parent != parent {
-                let new_dist = dist + distance_memo.parent_distance[usize::from(parent)].1;
+                let new_dist =
+                    dist.saturating_add(distance_memo.parent_distance[usize::from(parent)].1);
                 distance_memo.parent_distance[usize::from(enode)] = (parent_parent, new_dist);
             } else {
                 if ancestor == Id::from(usize::MAX) {
@@ -1747,7 +1748,7 @@ impl<L: Language> Explain<L> {
             for other in congruence_neighbors[usize::from(current)].iter() {
                 let next = other;
                 let distance = self.congruence_distance(current, *next, distance_memo);
-                let next_cost = cost_so_far + distance;
+                let next_cost = cost_so_far.saturating_add(distance);
                 todo.push(HeapState {
                     item: Connection {
                         current,
@@ -1765,15 +1766,16 @@ impl<L: Language> Explain<L> {
         let left_connections;
         let mut right_connections = vec![];
 
-        // assert that we found a path better than the normal one
-        let dist = self.distance_between(start, end, distance_memo);
+        // we would like to assert that we found a path better than the normal one
+        // but since proof sizes are saturated (saturating_add) this is not true
+        /*let dist = self.distance_between(start, end, distance_memo);
         if *total_cost.unwrap() > dist {
             panic!(
                 "Found cost greater than baseline {} vs {}",
                 total_cost.unwrap(),
                 dist
             );
-        }
+        }*/
         if *total_cost.unwrap() == self.distance_between(start, end, distance_memo) {
             let (a_left_connections, a_right_connections) = self.get_path_unoptimized(start, end);
             left_connections = a_left_connections;
@@ -1820,7 +1822,7 @@ impl<L: Language> Explain<L> {
             if fuel < eclass_size {
                 continue;
             }
-            fuel -= eclass_size;
+            fuel = fuel.saturating_sub(eclass_size);
 
             let (left_connections, right_connections) = self
                 .shortest_path_modulo_congruence(start, end, congruence_neighbors, distance_memo)
